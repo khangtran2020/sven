@@ -406,6 +406,11 @@ def model_from_pretrained(lm_path, model_type, config):
             model_class = QwenPrefixLM
         else:
             assert False
+    elif lm_path.startswith("Qwen"):
+        if model_type == "prefix":
+            model_class = QwenPrefixLM
+        else:
+            assert False
     else:
         assert False
 
