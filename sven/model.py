@@ -288,7 +288,7 @@ class QwenPrefixLM(Qwen2ForCausalLM):
         self.n_embed_per_head = config.hidden_size // config.num_attention_heads
         self.prefix_params = torch.nn.ParameterList()
         for _ in range(config.n_control):
-            for _ in range(config.n_layers):
+            for _ in range(config.num_hidden_layers):
                 # mha
                 for _ in range(2):
                     param_size = (
