@@ -216,10 +216,10 @@ def get_logits_from_lm(lm, inputs, control_ids):
         past = lm.get_past_from_prefix(control_ids)
     else:
         past = None
-    print("Debugging type:", inputs.size())
-    for item in past:
-        for it in item:
-            print(it.size())
+    # print("Debugging type:", inputs.size())
+    # for item in past:
+    #     for it in item:
+    #         print(it.size())
     outputs = lm(inputs, past_key_values=past)
     shift_logits = outputs.logits[..., :-1, :]
     shift_labels = inputs[..., 1:].unsqueeze(-1)
