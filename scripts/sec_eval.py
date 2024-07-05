@@ -191,7 +191,7 @@ def filter_cwe78_fps(s_out_dir, control):
 def eval_single(args, evaler, controls, prompt):
     set_seed(args)
     with torch.no_grad():
-        gen_output = evaler.sample(prompt=prompt, control=1)
+        gen_output = evaler.sample(prompt=prompt, control=len(controls) - 1)
     return gen_output
 
     # out_src_dir = os.path.join(s_out_dir, f"{control}_output")
