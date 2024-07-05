@@ -61,7 +61,7 @@ def get_evaler(args):
         controls = ["orig"]
     elif args.model_type == "prefix":
         evaler = PrefixEvaler(args)
-        controls = SEC_LABEL
+        controls = [SEC_LABEL]
     elif args.model_type == "text":
         evaler = TextPromptEvaler(args)
         controls = BINARY_LABELS
