@@ -61,7 +61,7 @@ def get_evaler(args):
         controls = ["orig"]
     elif args.model_type == "prefix":
         evaler = PrefixEvaler(args)
-        controls = [SEC_LABEL]
+        controls = BINARY_LABELS
     elif args.model_type == "text":
         evaler = TextPromptEvaler(args)
         controls = BINARY_LABELS
@@ -191,7 +191,7 @@ def filter_cwe78_fps(s_out_dir, control):
 def eval_single(args, evaler, controls, prompt):
     set_seed(args)
     with torch.no_grad():
-        gen_output = evaler.sample(prompt=prompt, control=controls)
+        gen_output = evaler.sample(prompt=prompt, control=1)
     return gen_output
 
     # out_src_dir = os.path.join(s_out_dir, f"{control}_output")
