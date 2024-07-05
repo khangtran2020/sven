@@ -441,6 +441,7 @@ def save_model(model, path, args):
             or args.pretrain_dir.startswith("facebook/incoder-")
             or args.pretrain_dir == "bigcode/santacoder"
             or args.pretrain_dir.startswith("models/")
+            or args.pretrain_dir.startswith("Qwen/")
         )
         config_file = os.path.join(path)
         model.config.save_pretrained(config_file)
