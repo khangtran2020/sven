@@ -64,4 +64,13 @@ MODEL_DIRS = {
     "6b": "Salesforce/codegen-6B-multi",
     "incoder": "facebook/incoder-6B",
     "santa": "bigcode/santacoder",
+    "qwen20": "../../LLaMA-Factory/models/qwen20-rq1-lora-merge",
+    "qwen22": "../../LLaMA-Factory/models/qwen22-rq1-lora-merge",
+    "qwen78": "../../LLaMA-Factory/models/qwen78-rq1-lora-merge",
+    "qwen79": "../../LLaMA-Factory/models/qwen79-rq1-lora-merge",
+    "claudia20": "../../LLaMA-Factory/models/claudia20-rq1-lora-merge",
+    "claudia22": "../../LLaMA-Factory/models/claudia22-rq1-lora-merge",
+    "claudia78": "../../LLaMA-Factory/models/claudia78-rq1-lora-merge",
+    "claudia79": "../../LLaMA-Factory/models/claudia79-rq1-lora-merge",
+    "claudia89": "../../LLaMA-Factory/models/claudia89-rq1-lora-merge",
 }
