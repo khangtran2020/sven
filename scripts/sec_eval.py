@@ -6,13 +6,15 @@ import shutil
 import argparse
 import subprocess
 import libcst as cst
+import pandas as pd
+from tqdm import tqdm
 from libcst.metadata import PositionProvider
 from libcst._position import CodePosition
 from collections import OrderedDict
 
 from sven.evaler import LMEvaler, PrefixEvaler, TextPromptEvaler
 from sven.utils import set_seed, set_logging, set_devices
-from sven.constant import BINARY_LABELS, MODEL_DIRS, CWES_DICT
+from sven.constant import BINARY_LABELS, MODEL_DIRS, CWES_DICT, SEC_LABEL
 
 
 def get_args():
@@ -48,8 +50,7 @@ def get_args():
         if args.model_dir in MODEL_DIRS:
             args.model_dir = MODEL_DIRS[args.model_dir]
 
-    args.output_dir = os.path.join(args.output_dir, args.output_name, args.eval_type)
-    args.data_dir = os.path.join(args.data_dir, args.eval_type)
+    # args.output_dir = os.path.join(args.output_dir, args.output_name, args.eval_type)
 
     return args
 
@@ -60,7 +61,7 @@ def get_evaler(args):
         controls = ["orig"]
     elif args.model_type == "prefix":
         evaler = PrefixEvaler(args)
-        controls = BINARY_LABELS
+        controls = SEC_LABEL
     elif args.model_type == "text":
         evaler = TextPromptEvaler(args)
         controls = BINARY_LABELS
@@ -187,94 +188,76 @@ def filter_cwe78_fps(s_out_dir, control):
                 csv_f.write(line)
 
 
-def eval_single(args, evaler, controls, output_dir, data_dir, vul_type, scenario):
-    s_out_dir = os.path.join(output_dir, scenario)
-    os.makedirs(s_out_dir)
-    s_in_dir = os.path.join(data_dir, scenario)
-    with open(os.path.join(s_in_dir, "info.json")) as f:
-        info = json.load(f)
-    with open(os.path.join(s_in_dir, "file_context." + info["language"])) as f:
-        file_context = f.read()
-    with open(os.path.join(s_in_dir, "func_context." + info["language"])) as f:
-        func_context = f.read()
+def eval_single(args, evaler, controls, prompt):
+    set_seed(args)
+    with torch.no_grad():
+        gen_output = evaler.sample(prompt=prompt, control=controls)
+    return gen_output
 
-    for control_id, control in enumerate(controls):
-        set_seed(args)
-        with torch.no_grad():
-            outputs, output_ids, dup_srcs, non_parsed_srcs = evaler.sample(
-                file_context, func_context, control_id, info["language"]
-            )
+    # out_src_dir = os.path.join(s_out_dir, f"{control}_output")
+    # os.makedirs(out_src_dir)
+    # output_ids_j = OrderedDict()
+    # all_fnames = set()
+    # for i, (output, output_id) in enumerate(zip(outputs, output_ids)):
+    #     fname = f"{str(i).zfill(2)}." + info["language"]
+    #     all_fnames.add(fname)
+    #     with open(os.path.join(out_src_dir, fname), "w") as f:
+    #         f.write(output)
+    #     output_ids_j[fname] = output_id
+    # with open(os.path.join(s_out_dir, f"{control}_output_ids.json"), "w") as f:
+    #     json.dump(output_ids_j, f, indent=2)
+    # if info["language"] == "c":
+    #     shutil.copy2("Makefile", out_src_dir)
 
-        out_src_dir = os.path.join(s_out_dir, f"{control}_output")
-        os.makedirs(out_src_dir)
-        output_ids_j = OrderedDict()
-        all_fnames = set()
-        for i, (output, output_id) in enumerate(zip(outputs, output_ids)):
-            fname = f"{str(i).zfill(2)}." + info["language"]
-            all_fnames.add(fname)
-            with open(os.path.join(out_src_dir, fname), "w") as f:
-                f.write(output)
-            output_ids_j[fname] = output_id
-        with open(os.path.join(s_out_dir, f"{control}_output_ids.json"), "w") as f:
-            json.dump(output_ids_j, f, indent=2)
-        if info["language"] == "c":
-            shutil.copy2("Makefile", out_src_dir)
+    # for srcs, name in [(dup_srcs, "dup"), (non_parsed_srcs, "non_parsed")]:
+    #     src_dir = os.path.join(s_out_dir, f"{control}_{name}")
+    #     os.makedirs(src_dir)
+    #     for i, src in enumerate(srcs):
+    #         fname = f"{str(i).zfill(2)}." + info["language"]
+    #         with open(os.path.join(src_dir, fname), "w") as f:
+    #             f.write(src)
 
-        for srcs, name in [(dup_srcs, "dup"), (non_parsed_srcs, "non_parsed")]:
-            src_dir = os.path.join(s_out_dir, f"{control}_{name}")
-            os.makedirs(src_dir)
-            for i, src in enumerate(srcs):
-                fname = f"{str(i).zfill(2)}." + info["language"]
-                with open(os.path.join(src_dir, fname), "w") as f:
-                    f.write(src)
+    # vuls = set()
+    # if len(outputs) != 0:
+    #     csv_path = os.path.join(s_out_dir, f"{control}_codeql.csv")
+    #     db_path = os.path.join(s_out_dir, f"{control}_codeql_db")
+    #     codeql_create_db(info, out_src_dir, db_path)
+    #     codeql_analyze(info, db_path, csv_path)
+    #     if vul_type == "cwe-078":
+    #         filter_cwe78_fps(s_out_dir, control)
+    #     with open(csv_path) as csv_f:
+    #         reader = csv.reader(csv_f)
+    #         for row in reader:
+    #             if len(row) < 5:
+    #                 continue
+    #             out_src_fname = row[-5].replace("/", "")
+    #             vuls.add(out_src_fname)
+    # secs = all_fnames - vuls
 
-        vuls = set()
-        if len(outputs) != 0:
-            csv_path = os.path.join(s_out_dir, f"{control}_codeql.csv")
-            db_path = os.path.join(s_out_dir, f"{control}_codeql_db")
-            codeql_create_db(info, out_src_dir, db_path)
-            codeql_analyze(info, db_path, csv_path)
-            if vul_type == "cwe-078":
-                filter_cwe78_fps(s_out_dir, control)
-            with open(csv_path) as csv_f:
-                reader = csv.reader(csv_f)
-                for row in reader:
-                    if len(row) < 5:
-                        continue
-                    out_src_fname = row[-5].replace("/", "")
-                    vuls.add(out_src_fname)
-        secs = all_fnames - vuls
-
-        d = OrderedDict()
-        d["vul_type"] = vul_type
-        d["scenario"] = scenario
-        d["control"] = control
-        d["total"] = len(all_fnames)
-        d["sec"] = len(secs)
-        d["vul"] = len(vuls)
-        d["dup"] = len(dup_srcs)
-        d["non_parsed"] = len(non_parsed_srcs)
-        d["model_type"] = args.model_type
-        d["model_dir"] = args.model_dir
-        d["temp"] = args.temp
-
-        yield d
+    # d = OrderedDict()
+    # d["vul_type"] = vul_type
+    # d["scenario"] = scenario
+    # d["control"] = control
+    # d["total"] = len(all_fnames)
+    # d["sec"] = len(secs)
+    # d["vul"] = len(vuls)
+    # d["dup"] = len(dup_srcs)
+    # d["non_parsed"] = len(non_parsed_srcs)
+    # d["model_type"] = args.model_type
+    # d["model_dir"] = args.model_dir
+    # d["temp"] = args.temp
 
 
-def eval_vul(args, evaler, controls, vul_types):
-    for vul_type in vul_types:
-        data_dir = os.path.join(args.data_dir, vul_type)
-        output_dir = os.path.join(args.output_dir, vul_type)
-        os.makedirs(output_dir)
-
-        with open(os.path.join(output_dir, "result.jsonl"), "w") as f:
-            for scenario in list(sorted(os.listdir(data_dir))):
-                for d in eval_single(
-                    args, evaler, controls, output_dir, data_dir, vul_type, scenario
-                ):
-                    s = json.dumps(d)
-                    args.logger.info(s)
-                    f.write(s + "\n")
+def eval_vul(args, evaler, controls):
+    data_dir = args.data_dir
+    df = pd.read_csv(data_dir)
+    prompts = df["prompt"].tolist()
+    preds = []
+    for prompt in tqdm(prompts):
+        pred = eval_single(args=args, evaler=evaler, controls=controls, prompt=prompt)
+        preds.append(pred)
+    df["pred"] = pred
+    df.to_csv(args.output_dir, index=False)
 
 
 def main():
@@ -286,13 +269,13 @@ def main():
     args.logger.info(f"args: {args}")
 
     evaler, controls = get_evaler(args)
-    assert args.eval_type in CWES_DICT
-    if args.vul_type is not None:
-        vul_types = [args.vul_type]
-    else:
-        vul_types = CWES_DICT[args.eval_type]
+    # assert args.eval_type in CWES_DICT
+    # if args.vul_type is not None:
+    #     vul_types = [args.vul_type]
+    # else:
+    #     vul_types = CWES_DICT[args.eval_type]
 
-    eval_vul(args, evaler, controls, vul_types)
+    eval_vul(args, evaler, controls)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from sven.model import CodeGenPrefixCausalLM, load_model
 from sven.constant import PROMPTS
 from sven.utils import try_parse
 
+
 class EvalerBase:
     def __init__(self, args):
         self.args = args
@@ -22,32 +23,33 @@ class EvalerBase:
         raise NotImplementedError()
 
     def truncate(self, completion, lang):
-        if lang == 'py':
-            for match in re.finditer('\n', completion):
+        if lang == "py":
+            for match in re.finditer("\n", completion):
                 cur_idx, next_idx = match.start(), match.end()
                 if next_idx < len(completion) and not completion[next_idx].isspace():
                     completion = completion[:cur_idx]
                     break
             else:
-                last_comment_str = '\n    #'
+                last_comment_str = "\n    #"
                 if last_comment_str in completion:
-                    completion = completion[:completion.rfind(last_comment_str)]
-        elif lang == 'c':
-            if '\n}' in completion:
-                completion = completion[:completion.find('\n}')+2]
+                    completion = completion[: completion.rfind(last_comment_str)]
+        elif lang == "c":
+            if "\n}" in completion:
+                completion = completion[: completion.find("\n}") + 2]
             else:
-                last_comment_strs = ['\n    //', '\n    /*']
+                last_comment_strs = ["\n    //", "\n    /*"]
                 for last_comment_str in last_comment_strs:
                     if last_comment_str in completion:
-                        completion = completion[:completion.rfind(last_comment_str)]
-                        completion = completion.rstrip() + '\n}'
+                        completion = completion[: completion.rfind(last_comment_str)]
+                        completion = completion.rstrip() + "\n}"
 
-            lines = completion.split('\n')
+            lines = completion.split("\n")
             final_lines = []
             for line in lines:
-                if '->name = "' in line: continue
+                if '->name = "' in line:
+                    continue
                 final_lines.append(line)
-            completion = '\n'.join(final_lines)
+            completion = "\n".join(final_lines)
         else:
             raise NotImplementedError()
 
@@ -61,32 +63,44 @@ class EvalerBase:
         dup_srcs, non_parsed_srcs = [], []
         for i, completion in enumerate(completions):
             if self.tokenizer.eos_token in completion:
-                completion = completion[:completion.find(self.tokenizer.eos_token)]
+                completion = completion[: completion.find(self.tokenizer.eos_token)]
             completion = self.truncate(completion, lang)
             completion_len = len(self.tokenizer.encode(completion))
             output_src = input_src + completion
-            output_src = output_src.rstrip() + '\n'
+            output_src = output_src.rstrip() + "\n"
             if output_src in output_srcs:
                 dup_srcs.append(output_src)
             elif try_parse(output_src, lang) != 0:
                 non_parsed_srcs.append(output_src)
             else:
                 output_srcs.append(output_src)
-                output_ids.append((gen_output[i][:input_ids_len].tolist(), gen_output[i][input_ids_len:input_ids_len+completion_len].tolist()))
+                output_ids.append(
+                    (
+                        gen_output[i][:input_ids_len].tolist(),
+                        gen_output[i][
+                            input_ids_len : input_ids_len + completion_len
+                        ].tolist(),
+                    )
+                )
 
         return output_srcs, output_ids, dup_srcs, non_parsed_srcs
+
 
 class LMEvaler(EvalerBase):
     def __init__(self, args):
         super().__init__(args)
 
     def load_model(self):
-        self.tokenizer, self.model, self.input_device = load_model('lm', self.args.model_dir, False, self.args)
+        self.tokenizer, self.model, self.input_device = load_model(
+            "lm", self.args.model_dir, False, self.args
+        )
         self.model.eval()
 
     def sample(self, file_context, func_context, control, lang):
         input_src = file_context + func_context
-        input_ids = self.tokenizer(input_src, return_tensors='pt').input_ids.to(self.input_device)
+        input_ids = self.tokenizer(input_src, return_tensors="pt").input_ids.to(
+            self.input_device
+        )
         input_ids_len = input_ids.shape[1]
         gen_output = self.model.generate(
             input_ids,
@@ -102,21 +116,24 @@ class LMEvaler(EvalerBase):
         )
         return self.process_completions(input_src, input_ids_len, gen_output, lang)
 
+
 class PrefixEvaler(EvalerBase):
     def __init__(self, args):
         super().__init__(args)
 
     def load_model(self):
-        self.tokenizer, self.model, self.input_device = load_model('prefix', self.args.model_dir, False, self.args)
+        self.tokenizer, self.model, self.input_device = load_model(
+            "prefix", self.args.model_dir, False, self.args
+        )
         self.model.eval()
 
-    def sample(self, file_context, func_context, control, lang):
-        return self.sample_prefix(file_context, func_context, control, lang)
+    def sample(self, prompt, control):
+        return self.sample_prefix(prompt=prompt, control=control)
 
-    def sample_prefix(self, file_context, func_context, control, lang):
-        input_src = file_context + func_context
-        input_ids = self.tokenizer(input_src, return_tensors='pt').input_ids.to(self.input_device)
-        input_ids_len = input_ids.shape[1]
+    def sample_prefix(self, prompt, control):
+        input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(
+            self.input_device
+        )
         gen_output = self.model.generate(
             input_ids,
             do_sample=True,
@@ -130,24 +147,29 @@ class PrefixEvaler(EvalerBase):
             # return_dict_in_generate=True,
             # output_scores=True,
         )
-        return self.process_completions(input_src, input_ids_len, gen_output, lang)
+        return gen_output
+
 
 class TextPromptEvaler(EvalerBase):
     def __init__(self, args):
         super().__init__(args)
 
     def load_model(self):
-        self.tokenizer, self.model, self.input_device = load_model('lm', self.args.model_dir, False, self.args)
+        self.tokenizer, self.model, self.input_device = load_model(
+            "lm", self.args.model_dir, False, self.args
+        )
         self.model.eval()
 
     def sample(self, file_context, func_context, control, lang):
-        if lang == 'py':
-            input_src = file_context + '# ' + PROMPTS[control] + func_context
-        elif lang == 'c':
-            input_src = file_context + '// ' + PROMPTS[control] + func_context
+        if lang == "py":
+            input_src = file_context + "# " + PROMPTS[control] + func_context
+        elif lang == "c":
+            input_src = file_context + "// " + PROMPTS[control] + func_context
         else:
             raise NotImplementedError()
-        input_ids = self.tokenizer(input_src, return_tensors='pt').input_ids.to(self.input_device)
+        input_ids = self.tokenizer(input_src, return_tensors="pt").input_ids.to(
+            self.input_device
+        )
         input_ids_len = input_ids.shape[1]
         gen_output = self.model.generate(
             input_ids,
