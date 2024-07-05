@@ -36,9 +36,9 @@ def get_args():
     parser.add_argument("--data_dir", type=str, default="../data_eval")
     parser.add_argument("--output_dir", type=str, default="../experiments/sec_eval")
 
-    parser.add_argument("--num_gen", type=int, default=25)
-    parser.add_argument("--temp", type=float, default=0.4)
-    parser.add_argument("--max_gen_len", type=int, default=300)
+    parser.add_argument("--num_gen", type=int, default=1)
+    parser.add_argument("--temp", type=float, default=0.0)
+    parser.add_argument("--max_gen_len", type=int, default=512)
     parser.add_argument("--top_p", type=float, default=0.95)
 
     parser.add_argument("--seed", type=int, default=1)
