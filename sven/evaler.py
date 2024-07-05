@@ -136,11 +136,11 @@ class PrefixEvaler(EvalerBase):
         )
         gen_output = self.model.generate(
             input_ids,
-            do_sample=True,
+            do_sample=False,
             num_return_sequences=self.args.num_gen,
-            temperature=self.args.temp,
+            # temperature=self.args.temp,
             max_new_tokens=self.args.max_gen_len,
-            top_p=self.args.top_p,
+            # top_p=self.args.top_p,
             pad_token_id=self.tokenizer.pad_token_id,
             use_cache=True,
             control_id=control,
