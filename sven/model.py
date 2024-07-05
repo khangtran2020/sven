@@ -401,7 +401,7 @@ def model_from_pretrained(lm_path, model_type, config):
             model_class = SantaPrefixLM
         else:
             assert False
-    elif lm_path.startswith("models/"):
+    elif "LLaMA-Factory/models" in lm_path:
         if model_type == "prefix":
             model_class = QwenPrefixLM
         else:
@@ -440,7 +440,7 @@ def save_model(model, path, args):
             args.pretrain_dir.startswith("Salesforce/codegen-")
             or args.pretrain_dir.startswith("facebook/incoder-")
             or args.pretrain_dir == "bigcode/santacoder"
-            or args.pretrain_dir.startswith("models/")
+            or "LLaMA-Factory/models" in args.pretrain_dir
             or args.pretrain_dir.startswith("Qwen/")
         )
         config_file = os.path.join(path)
