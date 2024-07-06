@@ -257,7 +257,7 @@ def eval_vul(args, evaler, controls):
         pred = eval_single(args=args, evaler=evaler, controls=controls, prompt=prompt)
         preds.append(pred)
     df["pred"] = preds
-    df.to_csv(args.output_dir, index=False)
+    df.to_csv(os.path.join(args.output_dir, args.output_name), index=False)
 
 
 def main():
