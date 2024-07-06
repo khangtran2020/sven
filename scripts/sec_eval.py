@@ -256,7 +256,7 @@ def eval_vul(args, evaler, controls):
     for prompt in tqdm(prompts):
         pred = eval_single(args=args, evaler=evaler, controls=controls, prompt=prompt)
         preds.append(pred)
-    df["pred"] = pred
+    df["pred"] = preds
     df.to_csv(args.output_dir, index=False)
 
 
