@@ -147,7 +147,9 @@ class PrefixEvaler(EvalerBase):
             # return_dict_in_generate=True,
             # output_scores=True,
         )
-        return gen_output
+        output_ids = gen_output[0]
+        output = self.tokenizer.decode(output_ids)
+        return output
 
 
 class TextPromptEvaler(EvalerBase):

@@ -42,6 +42,7 @@ def get_args():
     parser.add_argument("--top_p", type=float, default=0.95)
 
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--debug", type=int, default=0)
     args = parser.parse_args()
 
     if args.model_type == "lm":
@@ -251,6 +252,8 @@ def eval_single(args, evaler, controls, prompt):
 def eval_vul(args, evaler, controls):
     data_dir = args.data_dir
     df = pd.read_csv(data_dir)
+    if args.debug:
+        df = df.sample(n=10).copy().reset_index(drop=True)
     prompts = df["prompt"].tolist()
     preds = []
     for prompt in tqdm(prompts):
