@@ -13,25 +13,28 @@ from sven.model import load_model, XGLMForCausalLM, GPT2LMHeadCustomModel
 from sven.constant import PROMPTS, MODEL_DIRS
 from sven.human_eval.problem_yaml import Problem
 
+
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_name', type=str, required=True)
+    parser.add_argument("--output_name", type=str, required=True)
 
-    parser.add_argument('--model_type', type=str, choices=['lm', 'prefix', 'text'], required=True)
-    parser.add_argument('--model_dir', type=str, default=None)
-    parser.add_argument('--control', type=str, choices=['sec', 'vul'], default='sec')
+    parser.add_argument(
+        "--model_type", type=str, choices=["lm", "prefix", "text"], required=True
+    )
+    parser.add_argument("--model_dir", type=str, default=None)
+    parser.add_argument("--control", type=str, choices=["sec", "vul"], default="sec")
 
-    parser.add_argument('--temp', type=float, default=0.4)
-    parser.add_argument('--top_p', type=float, default=0.95)
-    parser.add_argument('--max_gen_len', type=int, default=300)
-    parser.add_argument('--num_samples', type=int, default=100)
-    parser.add_argument('--num_samples_per_gen', type=int, default=25)
+    parser.add_argument("--temp", type=float, default=0.0)
+    parser.add_argument("--top_p", type=float, default=0.95)
+    parser.add_argument("--max_gen_len", type=int, default=300)
+    parser.add_argument("--num_samples", type=int, default=1)
+    parser.add_argument("--num_samples_per_gen", type=int, default=1)
 
-    parser.add_argument('--eval_type', type=str, default='human_eval')
-    parser.add_argument('--output_dir', type=str, default='../experiments')
-    parser.add_argument('--data_dir', type=str, default='../data_eval')
+    parser.add_argument("--eval_type", type=str, default="human_eval")
+    parser.add_argument("--output_dir", type=str, default="../experiments")
+    parser.add_argument("--data_dir", type=str, default="../data_eval")
 
-    parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument("--seed", type=int, default=1)
     args = parser.parse_args()
 
     assert args.num_samples % args.num_samples_per_gen == 0
@@ -45,13 +48,16 @@ def get_args():
 
     return args
 
+
 args = get_args()
+
 
 def trim_code(completion, stop_tokens):
     for stop_token in stop_tokens:
         if stop_token in completion:
-            completion = completion[:completion.find(stop_token)]
+            completion = completion[: completion.find(stop_token)]
     return completion
+
 
 def main():
     output_dir = Path(args.output_dir)
@@ -66,8 +72,8 @@ def main():
         )
     )
 
-    if args.model_type in ('lm', 'text'):
-        model_dir = '2b' if args.model_dir is None else args.model_dir
+    if args.model_type in ("lm", "text"):
+        model_dir = "2b" if args.model_dir is None else args.model_dir
         if model_dir in MODEL_DIRS:
             model_dir = MODEL_DIRS[model_dir]
     else:
@@ -75,30 +81,32 @@ def main():
         model_dir = args.model_dir
 
     args.n_gpu = torch.cuda.device_count()
-    args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    tokenizer, model, device = load_model('prefix' if args.model_type == 'prefix' else 'lm', model_dir, False, args)
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer, model, device = load_model(
+        "prefix" if args.model_type == "prefix" else "lm", model_dir, False, args
+    )
     model.eval()
 
     for problem_yaml_path in tqdm(problems):
         with problem_yaml_path.open() as f:
             problem = Problem.load(f)
         prompt = problem.prompt
-        if args.model_type == 'text':
-            if args.control == 'sec':
+        if args.model_type == "text":
+            if args.control == "sec":
                 prompt = PROMPTS[0] + prompt
             else:
                 prompt = PROMPTS[1] + prompt
         if isinstance(model, GPT2LMHeadCustomModel):
             prompt = prompt.strip()
-        inputs = tokenizer(prompt, return_tensors='pt').to(device)
+        inputs = tokenizer(prompt, return_tensors="pt").to(device)
         if isinstance(model, XGLMForCausalLM):
-            del inputs['token_type_ids']
+            del inputs["token_type_ids"]
         kwargs = dict()
-        if args.model_type == 'prefix':
-            if args.control == 'sec':
-                kwargs['control_id'] = 0
+        if args.model_type == "prefix":
+            if args.control == "sec":
+                kwargs["control_id"] = 0
             else:
-                kwargs['control_id'] = 1
+                kwargs["control_id"] = 1
         for i in range(args.num_samples // args.num_samples_per_gen):
             set_seed(args)
             with torch.no_grad():
@@ -115,9 +123,9 @@ def main():
                     **kwargs
                 )
             for sample in samples.tolist():
-                completion = sample[inputs['input_ids'].shape[1]:]
+                completion = sample[inputs["input_ids"].shape[1] :]
                 if tokenizer.eos_token_id in completion:
-                    completion = completion[:completion.index(tokenizer.eos_token_id)]
+                    completion = completion[: completion.index(tokenizer.eos_token_id)]
                 completion = tokenizer.decode(completion)
                 completion = trim_code(completion, problem.stop_tokens)
                 problem.completions.append(completion)
@@ -125,5 +133,6 @@ def main():
         with problem_yaml_path.open("w") as f:
             f.write(Problem.dump(problem))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

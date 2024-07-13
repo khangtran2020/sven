@@ -21,6 +21,7 @@ WORKING_DIR = Path(__file__).parent.parent
 CACHE = dict()
 CACHE_LOCK = Lock()
 
+
 def cache_get(program: str) -> Optional[dict]:
     if program in CACHE:
         result = CACHE[program]
@@ -28,13 +29,15 @@ def cache_get(program: str) -> Optional[dict]:
     else:
         return None
 
+
 def cache_set(program: str, result: dict):
     if program in CACHE:
         print("Setting already-existing cache")
     CACHE[program] = result
 
+
 def cached_eval_script(problem, index) -> dict:
-    program = problem.prompt + problem.completions[index] + '\n' + problem.tests
+    program = problem.prompt + problem.completions[index] + "\n" + problem.tests
     CACHE_LOCK.acquire(True)
     cached = cache_get(program)
     if cached is not None:
@@ -50,34 +53,50 @@ def cached_eval_script(problem, index) -> dict:
             result_yaml["timestamp"] = int(time.time())
         return result_yaml
 
+
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
+
 def evaluate_problem_in_container(problem_yaml_path: Path, index):
-    proc = subprocess.run(["podman", "run", "--rm", "--volume",
-        f"{WORKING_DIR}:/multipleval:rw",
-        "--timeout", "30",
-        "multipleval", "python3",
-        "containerized_eval.py",
-        "--problem_yaml_path", str(problem_yaml_path),
-        "--index", str(index)],
+    proc = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--rm",
+            "--volume",
+            f"{WORKING_DIR}:/multipleval:rw",
+            "--timeout",
+            "30",
+            "multipleval",
+            "python3",
+            "containerized_eval.py",
+            "--problem_yaml_path",
+            str(problem_yaml_path),
+            "--index",
+            str(index),
+        ],
         capture_output=True,
-        stdin=subprocess.DEVNULL)
+        stdin=subprocess.DEVNULL,
+    )
     if proc.returncode == 0:
         return proc.stdout.decode("utf-8")
 
-    return json.dumps({
-        "exit_code": proc.returncode,
-        "stdout": proc.stdout.decode("utf-8"),
-        "stderr": proc.stderr.decode("utf-8"),
-        "program": "",
-        "status": "Container timeout",
-    })
+    return json.dumps(
+        {
+            "exit_code": proc.returncode,
+            "stdout": proc.stdout.decode("utf-8"),
+            "stderr": proc.stderr.decode("utf-8"),
+            "program": "",
+            "status": "Container timeout",
+        }
+    )
 
 
 def get_test_results_yaml_path(problem_yaml_path: Path) -> Path:
     return problem_yaml_path.parent / (problem_yaml_path.stem + ".results.yaml")
+
 
 def evaluate_problem(problem_yaml_path: Path, max_workers: int):
     with open(problem_yaml_path) as f:
@@ -111,17 +130,22 @@ def evaluate_problem(problem_yaml_path: Path, max_workers: int):
 
     # In case we have previously computed results, warm the cache with them
     for already_computed in test_results["results"]:
-      CACHE[already_computed["program"]] = already_computed
+        CACHE[already_computed["program"]] = already_computed
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for j in executor.map(lambda index: cached_eval_script(problem, index), range(min_problem, num_problems)):
+        for j in executor.map(
+            lambda index: cached_eval_script(problem, index),
+            range(min_problem, num_problems),
+        ):
             test_results["results"].append(j)
             with test_results_path.open("w") as f:
                 f.write(yaml.dump(test_results, Dumper=NoAliasDumper))
 
 
 def evaluate_problems(target_dir: Path, max_workers: int):
-    problems = [ p for p in target_dir.glob("*.yaml") if not p.name.endswith(".results.yaml") ]
+    problems = [
+        p for p in target_dir.glob("*.yaml") if not p.name.endswith(".results.yaml")
+    ]
 
     for problem_yaml_path in tqdm(problems, desc=str(target_dir)):
         evaluate_problem(problem_yaml_path, max_workers)
@@ -131,14 +155,19 @@ def main():
     args = argparse.ArgumentParser()
     args.add_argument("--output_name", type=str, required=True)
     args.add_argument("--max_workers", type=int, default=50)
-    args.add_argument('--output_dir', type=str, default='../experiments')
-    args.add_argument('--eval_type', type=str, default='human_eval')
+    args.add_argument("--output_dir", type=str, default="../experiments")
+    args.add_argument("--eval_type", type=str, default="human_eval")
     args = args.parse_args()
     args.output_dir = os.path.join(args.output_dir, args.eval_type, args.output_name)
 
-    files = [ p for p in Path(args.output_dir).glob("*.yaml") if not p.name.endswith(".results.yaml") ]
+    files = [
+        p
+        for p in Path(args.output_dir).glob("*.yaml")
+        if not p.name.endswith(".results.yaml")
+    ]
     for file in tqdm(files):
         evaluate_problem(file, args.max_workers)
+
 
 if __name__ == "__main__":
     main()
