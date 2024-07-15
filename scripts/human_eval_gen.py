@@ -112,7 +112,7 @@ def main():
             with torch.no_grad():
                 samples = model.generate(
                     **inputs,
-                    do_sample=True,
+                    do_sample=False,
                     num_return_sequences=args.num_samples_per_gen,
                     temperature=args.temp,
                     max_new_tokens=args.max_gen_len,
